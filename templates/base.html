@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}GrandStay Hotel Room Management System{% endblock %}</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Font Awesome 6 Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+  <!-- Chart.js 4.4 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+
+  <!-- GrandStay Design System CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+  <div class="app-container">
+    <!-- ========================================================
+         SIDEBAR NAVIGATION
+         ======================================================== -->
+    <aside class="sidebar" id="appSidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-brand">
+          <img src="{{ url_for('static', filename='images/hotel-logo.svg') }}" alt="GrandStay Logo" class="sidebar-logo">
+        </div>
+      </div>
+
+      <nav class="sidebar-nav-container">
+        <div class="sidebar-heading">Main Operations</div>
+
+        <a href="{{ url_for('dashboard.dashboard_view') }}" class="sidebar-link {% if request.endpoint == 'dashboard.dashboard_view' %}active{% endif %}" id="nav-dashboard">
+          <i class="fas fa-chart-pie"></i>
+          <span>Dashboard</span>
+        </a>
+
+        <a href="{{ url_for('rooms.list_rooms') }}" class="sidebar-link {% if request.blueprint == 'rooms' %}active{% endif %}" id="nav-rooms">
+          <i class="fas fa-door-open"></i>
+          <span>Rooms</span>
+        </a>
+
+        <a href="{{ url_for('customers.list_customers') }}" class="sidebar-link {% if request.blueprint == 'customers' %}active{% endif %}" id="nav-customers">
+          <i class="fas fa-users"></i>
+          <span>Customers</span>
+        </a>
+
+        <a href="{{ url_for('bookings.list_bookings') }}" class="sidebar-link {% if request.endpoint == 'bookings.list_bookings' %}active{% endif %}" id="nav-bookings">
+          <i class="fas fa-calendar-check"></i>
+          <span>Bookings</span>
+        </a>
+
+        <a href="{{ url_for('bookings.booking_history') }}" class="sidebar-link {% if request.endpoint == 'bookings.booking_history' %}active{% endif %}" id="nav-booking-history">
+          <i class="fas fa-history"></i>
+          <span>Booking History</span>
+        </a>
+
+        <div class="sidebar-heading">Finance &amp; Insights</div>
+
+        <a href="{{ url_for('billing.list_billing') }}" class="sidebar-link {% if request.blueprint == 'billing' %}active{% endif %}" id="nav-billing">
+          <i class="fas fa-file-invoice-dollar"></i>
+          <span>Billing</span>
+        </a>
+
+        <a href="{{ url_for('reports.reports_view') }}" class="sidebar-link {% if request.blueprint == 'reports' %}active{% endif %}" id="nav-reports">
+          <i class="fas fa-chart-line"></i>
+          <span>Reports</span>
+        </a>
+
+        <div class="sidebar-heading">Project &amp; System</div>
+
+        <a href="{{ url_for('general.about_project') }}" class="sidebar-link {% if request.endpoint == 'general.about_project' %}active{% endif %}" id="nav-about">
+          <i class="fas fa-graduation-cap"></i>
+          <span>About Project</span>
+        </a>
+
+        <a href="{{ url_for('general.settings_view') }}" class="sidebar-link {% if request.endpoint == 'general.settings_view' %}active{% endif %}" id="nav-settings">
+          <i class="fas fa-cog"></i>
+          <span>Settings</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="hotel-status-pill">
+          <div class="status-dot"></div>
+          <div class="hotel-status-info">
+            <span class="status-title">{{ hotel_name }}</span>
+            <span class="status-sub">Online Management</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ========================================================
+         MAIN CONTENT WRAPPER
+         ======================================================== -->
+    <div class="main-wrapper">
+      <!-- Top Navigation Bar -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button type="button" class="mobile-toggle-btn" id="mobileSidebarToggle" aria-label="Toggle navigation">
+            <i class="fas fa-bars"></i>
+          </button>
+          <div class="page-title-box">
+            <h2>{% block page_title %}Dashboard{% endblock %}</h2>
+            <p>{% block page_subtitle %}Smart Hotel Room, Availability and Reservation Overview{% endblock %}</p>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <!-- Live Date Badge -->
+          <div class="topbar-date-badge">
+            <i class="far fa-calendar-alt"></i>
+            <span>{{ current_date_str }}</span>
+          </div>
+
+          <!-- Quick Action CTA Button -->
+          <button type="button" class="btn-quick-booking" data-trigger-booking id="topbarNewBookingBtn">
+            <i class="fas fa-plus-circle"></i>
+            <span>New Booking</span>
+          </button>
+
+          <!-- Administrator Profile -->
+          <div class="topbar-user">
+            <div class="user-avatar">
+              <span>AD</span>
+            </div>
+            <div class="user-info">
+              <span class="user-name">Hotel Admin</span>
+              <span class="user-role">Operations Desk</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Body Area -->
+      <main class="content-area">
+        <!-- Flash Alert Messages -->
+        <div class="alerts-container">
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              {% for category, message in messages %}
+                <div class="alert alert-{{ category if category != 'error' else 'danger' }}">
+                  <i class="fas {% if category == 'success' %}fa-check-circle{% elif category == 'error' %}fa-exclamation-circle{% else %}fa-info-circle{% endif %} alert-icon"></i>
+                  <span>{{ message }}</span>
+                  <button type="button" class="alert-close">&times;</button>
+                </div>
+              {% endfor %}
+            {% endif %}
+          {% endwith %}
+        </div>
+
+        <!-- Page Specific Content -->
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+
+  <!-- Global Modals Block -->
+  {% block modals %}{% endblock %}
+
+  <!-- Core JavaScript -->
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

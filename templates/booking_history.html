@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Booking History | {{ hotel_name }}{% endblock %}
+{% block page_title %}Booking &amp; Reservation History{% endblock %}
+{% block page_subtitle %}Comprehensive audit trail of all historical, checked-out, and cancelled bookings{% endblock %}
+
+{% block content %}
+
+<!-- Filters & Search Toolbar -->
+<form method="GET" action="{{ url_for('bookings.booking_history') }}" class="filter-bar">
+  <div class="search-box">
+    <i class="fas fa-search"></i>
+    <input type="text" name="search" class="search-input" placeholder="Search by booking code, guest, phone, or room..." value="{{ search }}">
+  </div>
+
+  <select name="status" class="filter-select" onchange="this.form.submit()">
+    <option value="ALL" {% if selected_status == 'ALL' %}selected{% endif %}>All Reservation Statuses</option>
+    <option value="CHECKED_OUT" {% if selected_status == 'CHECKED_OUT' %}selected{% endif %}>Checked Out</option>
+    <option value="CONFIRMED" {% if selected_status == 'CONFIRMED' %}selected{% endif %}>Confirmed</option>
+    <option value="CHECKED_IN" {% if selected_status == 'CHECKED_IN' %}selected{% endif %}>Checked In</option>
+    <option value="CANCELLED" {% if selected_status == 'CANCELLED' %}selected{% endif %}>Cancelled</option>
+  </select>
+
+  <!-- Date Range Filters -->
+  <div style="display: flex; align-items: center; gap: 0.4rem;">
+    <span style="font-size: 0.8rem; color: #64748b; font-weight: 600;">From:</span>
+    <input type="date" name="date_from" class="form-control" value="{{ date_from }}" style="padding: 0.45rem 0.65rem; font-size: 0.82rem; width: 145px;" onchange="this.form.submit()">
+  </div>
+
+  <div style="display: flex; align-items: center; gap: 0.4rem;">
+    <span style="font-size: 0.8rem; color: #64748b; font-weight: 600;">To:</span>
+    <input type="date" name="date_to" class="form-control" value="{{ date_to }}" style="padding: 0.45rem 0.65rem; font-size: 0.82rem; width: 145px;" onchange="this.form.submit()">
+  </div>
+
+  {% if search or selected_status != 'ALL' or date_from or date_to %}
+    <a href="{{ url_for('bookings.booking_history') }}" class="btn btn-secondary btn-sm" title="Clear Filters">
+      <i class="fas fa-times"></i> Reset
+    </a>
+  {% endif %}
+
+  <div style="margin-left: auto;">
+    <a href="{{ url_for('reports.export_bookings_csv') }}" class="btn btn-sm btn-secondary" title="Export CSV">
+      <i class="fas fa-file-csv"></i> Export CSV
+    </a>
+  </div>
+</form>
+
+<!-- Historical Table -->
+<div class="surface-card">
+  <div class="surface-header">
+    <h3 class="surface-title">
+      <i class="fas fa-history"></i>
+      <span>All Historical Records ({{ bookings | length }})</span>
+    </h3>
+  </div>
+
+  <div class="table-responsive">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Booking Code</th>
+          <th>Guest Name</th>
+          <th>Room Number</th>
+          <th>Stay Duration</th>
+          <th>Nights</th>
+          <th>Total Billed</th>
+          <th>Booking Status</th>
+          <th>Payment Status</th>
+          <th>Created Date</th>
+          <th>Invoice</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if bookings %}
+          {% for b in bookings %}
+            <tr>
+              <td><strong>{{ b.booking_code }}</strong></td>
+              <td>
+                <div style="font-weight: 700; color: #0f172a;">{{ b.customer_name }}</div>
+                <small style="color: #64748b;">{{ b.customer_phone }}</small>
+              </td>
+              <td>
+                <span class="badge" style="background: #f1f5f9; color: #334155; font-weight: 700;">
+                  Room {{ b.room_number }} ({{ b.room_type }})
+                </span>
+              </td>
+              <td>{{ b.check_in | format_date }} &rarr; {{ b.check_out | format_date }}</td>
+              <td>{{ b.total_nights }}</td>
+              <td><strong>{{ b.total_amount | currency }}</strong></td>
+              <td>
+                <span class="badge badge-{{ b.status.lower() }}">
+                  <span class="badge-dot"></span> {{ b.status }}
+                </span>
+              </td>
+              <td>
+                <span class="badge badge-{{ (b.payment_status or 'Pending').lower() }}">
+                  <span class="badge-dot"></span> {{ b.payment_status or 'Pending' }}
+                </span>
+              </td>
+              <td>{{ b.created_at | format_date }}</td>
+              <td>
+                <a href="{{ url_for('billing.view_invoice', booking_id=b.id) }}" class="btn btn-sm btn-secondary" title="Print Invoice">
+                  <i class="fas fa-print"></i> Invoice
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="10">
+              <div class="empty-state">
+                <div class="empty-icon"><i class="fas fa-folder-open"></i></div>
+                <h4 class="empty-title">No Historical Records Found</h4>
+                <p class="empty-desc">No records match your search query or date range filters.</p>
+              </div>
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

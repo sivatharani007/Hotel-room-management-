@@ -1,0 +1,465 @@
+{% extends "base.html" %}
+
+{% block title %}Booking Management | {{ hotel_name }}{% endblock %}
+{% block page_title %}Reservation &amp; Booking Management{% endblock %}
+{% block page_subtitle %}Manage guest check-ins, reservations, cancellations, and check-outs{% endblock %}
+
+{% block content %}
+
+<!-- Header & Filter Bar -->
+<div class="filter-bar">
+  <form method="GET" action="{{ url_for('bookings.list_bookings') }}" class="search-box">
+    <i class="fas fa-search"></i>
+    <input type="text" name="search" class="search-input" placeholder="Search by booking code, guest name, phone, or room..." value="{{ search }}">
+  </form>
+
+  <form method="GET" action="{{ url_for('bookings.list_bookings') }}">
+    <select name="status" class="filter-select" onchange="this.form.submit()">
+      <option value="ALL" {% if selected_status == 'ALL' %}selected{% endif %}>All Booking Statuses</option>
+      <option value="CONFIRMED" {% if selected_status == 'CONFIRMED' %}selected{% endif %}>Confirmed</option>
+      <option value="CHECKED_IN" {% if selected_status == 'CHECKED_IN' %}selected{% endif %}>Checked In</option>
+      <option value="CHECKED_OUT" {% if selected_status == 'CHECKED_OUT' %}selected{% endif %}>Checked Out</option>
+      <option value="CANCELLED" {% if selected_status == 'CANCELLED' %}selected{% endif %}>Cancelled</option>
+    </select>
+  </form>
+
+  <!-- Quick Booking Code Finder -->
+  <div style="display: flex; gap: 0.4rem; align-items: center;">
+    <input type="text" id="searchBookingCodeInput" class="form-control" placeholder="Quick code search (e.g. GS-...)" style="width: 220px; padding: 0.55rem 0.85rem; font-size: 0.84rem;">
+    <button type="button" id="btnSearchBookingCode" class="btn btn-sm btn-secondary" title="Search Code">
+      <i class="fas fa-arrow-right"></i>
+    </button>
+  </div>
+
+  <div style="margin-left: auto;">
+    <button type="button" class="btn btn-primary" onclick="openModal('newBookingModal')">
+      <i class="fas fa-calendar-plus"></i> New Reservation
+    </button>
+  </div>
+</div>
+
+<!-- Bookings Surface Card -->
+<div class="surface-card">
+  <div class="surface-header">
+    <h3 class="surface-title">
+      <i class="fas fa-calendar-alt"></i>
+      <span>Hotel Reservations</span>
+    </h3>
+    <a href="{{ url_for('bookings.booking_history') }}" class="btn btn-sm btn-secondary">
+      <i class="fas fa-archive"></i> View Full Historical Archive
+    </a>
+  </div>
+
+  <div class="table-responsive">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Booking Code</th>
+          <th>Guest Details</th>
+          <th>Room</th>
+          <th>Stay Period</th>
+          <th>Nights</th>
+          <th>Rate / Night</th>
+          <th>Total Bill</th>
+          <th>Booking Status</th>
+          <th>Payment</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if bookings %}
+          {% for b in bookings %}
+            <tr>
+              <td>
+                <strong style="color: #2563eb;">{{ b.booking_code }}</strong>
+              </td>
+              <td>
+                <div style="font-weight: 700; color: #0f172a;">{{ b.customer_name }}</div>
+                <small style="color: #64748b;"><i class="fas fa-phone-alt" style="font-size: 0.75rem;"></i> {{ b.customer_phone }}</small>
+              </td>
+              <td>
+                <span class="badge" style="background: #f1f5f9; color: #1e293b; font-weight: 700;">
+                  Room {{ b.room_number }} ({{ b.room_type }})
+                </span>
+              </td>
+              <td>
+                <div style="font-size: 0.84rem;">{{ b.check_in | format_date }}</div>
+                <div style="font-size: 0.78rem; color: #94a3b8;">to {{ b.check_out | format_date }}</div>
+              </td>
+              <td><strong>{{ b.total_nights }}</strong></td>
+              <td>{{ b.price_per_night | currency }}</td>
+              <td><strong style="color: #0f172a; font-size: 0.95rem;">{{ b.total_amount | currency }}</strong></td>
+              <td>
+                <span class="badge badge-{{ b.status.lower() }}">
+                  <span class="badge-dot"></span> {{ b.status }}
+                </span>
+              </td>
+              <td>
+                <span class="badge badge-{{ (b.payment_status or 'Pending').lower() }}">
+                  <span class="badge-dot"></span> {{ b.payment_status or 'Pending' }}
+                </span>
+              </td>
+              <td>
+                <div class="action-btn-group">
+                  <!-- Invoice Print Link -->
+                  <a href="{{ url_for('billing.view_invoice', booking_id=b.id) }}" class="btn-icon btn-view" title="Print Invoice / Bill">
+                    <i class="fas fa-print"></i>
+                  </a>
+
+                  <!-- Check-out Action (If active) -->
+                  {% if b.status in ['CONFIRMED', 'CHECKED_IN'] %}
+                    <button type="button" class="btn-icon" data-checkout-booking="{{ b.id }}" title="Guest Check-Out" style="color: #0d9488; background: #ccfbf1; border-color: #99f6e4;">
+                      <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                  {% endif %}
+
+                  <!-- Cancellation Action (If not already cancelled or checked out) -->
+                  {% if b.status in ['CONFIRMED', 'CHECKED_IN'] %}
+                    <button type="button" class="btn-icon btn-delete" data-cancel-booking="{{ b.id }}" title="Cancel Reservation">
+                      <i class="fas fa-ban"></i>
+                    </button>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="10">
+              <div class="empty-state">
+                <div class="empty-icon"><i class="fas fa-calendar-times"></i></div>
+                <h4 class="empty-title">No Bookings Found</h4>
+                <p class="empty-desc">There are no reservation records matching your selected status or filter.</p>
+                <button type="button" class="btn btn-primary" onclick="openModal('newBookingModal')">
+                  <i class="fas fa-calendar-plus"></i> Create Reservation
+                </button>
+              </div>
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block modals %}
+<!-- ========================================================
+     11-STEP INTERACTIVE BOOKING WIZARD MODAL
+     ======================================================== -->
+<div class="modal-overlay" id="newBookingModal">
+  <div class="modal-card modal-lg">
+    <div class="modal-header">
+      <h3 class="modal-title"><i class="fas fa-hotel"></i> GrandStay Reservation Wizard</h3>
+      <button type="button" class="modal-close" data-close-modal="newBookingModal">&times;</button>
+    </div>
+
+    <!-- Wizard Steps Indicator -->
+    <div style="padding: 1.5rem 1.75rem 0.5rem; background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+      <div class="wizard-progress">
+        <div class="wizard-step active" id="stepPill1">
+          <div class="wizard-step-circle">1</div>
+          <span class="wizard-step-title">Stay &amp; Room Selection</span>
+        </div>
+        <div class="wizard-step" id="stepPill2">
+          <div class="wizard-step-circle">2</div>
+          <span class="wizard-step-title">Review &amp; Confirm</span>
+        </div>
+      </div>
+    </div>
+
+    <form id="newBookingForm">
+      <!-- Hidden Input for Selected Room ID -->
+      <input type="hidden" id="book_selected_room_id" name="room_id" required>
+
+      <!-- WIZARD STEP 1: Details & Room Selection -->
+      <div id="wizardStep1" class="modal-body">
+        <!-- Customer Selection -->
+        <div class="form-group">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+            <label class="form-label" style="margin-bottom: 0;">Select Guest <span class="required">*</span></label>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="openModal('quickCustomerModal')">
+              <i class="fas fa-plus"></i> Quick Add New Guest
+            </button>
+          </div>
+          <select id="book_customer_id" name="customer_id" class="form-control" required>
+            <option value="">-- Choose from registered guests --</option>
+            {% for c in customers %}
+              <option value="{{ c.id }}">{{ c.full_name }} ({{ c.phone }})</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Date Range Selection -->
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Check-in Date <span class="required">*</span></label>
+            <input type="date" id="book_check_in" name="check_in" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Check-out Date <span class="required">*</span></label>
+            <input type="date" id="book_check_out" name="check_out" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Guests Count</label>
+            <select id="book_guests" name="guests" class="form-control">
+              <option value="1">1 Guest</option>
+              <option value="2" selected>2 Guests</option>
+              <option value="3">3 Guests</option>
+              <option value="4">4 Guests</option>
+              <option value="5">5+ Guests</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Room Filter -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin: 1rem 0 0.5rem;">
+          <h4 style="font-size: 0.95rem; font-weight: 700; color: #0f172a;">
+            <i class="fas fa-door-open" style="color: #2563eb;"></i> Select Available Room
+          </h4>
+          <select id="book_room_type_filter" class="filter-select" style="padding: 0.35rem 1.8rem 0.35rem 0.65rem; font-size: 0.8rem;">
+            <option value="ALL">All Available Room Types</option>
+            <option value="Standard">Standard</option>
+            <option value="Deluxe">Deluxe</option>
+            <option value="Suite">Suite</option>
+            <option value="Family Room">Family Room</option>
+          </select>
+        </div>
+
+        <!-- Dynamic Available Rooms Container -->
+        <div id="availableRoomsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.85rem; max-height: 240px; overflow-y: auto; padding: 0.25rem;">
+          <!-- Dynamically populated via AJAX fetch /rooms/api/available -->
+        </div>
+
+        <!-- Live Estimate Bar -->
+        <div style="background: #eff6ff; border-radius: 10px; padding: 0.85rem 1.25rem; margin-top: 1.25rem; display: flex; justify-content: space-between; align-items: center; border: 1px solid #bfdbfe;">
+          <div>
+            <span style="font-size: 0.8rem; color: #1e40af; font-weight: 600;">Stay Duration:</span>
+            <strong id="displayNights" style="color: #1e3a8a; margin-left: 0.35rem;">1 night</strong>
+          </div>
+          <div>
+            <span style="font-size: 0.8rem; color: #1e40af; font-weight: 600;">Estimated Bill:</span>
+            <strong id="displayTotal" style="color: #1e3a8a; font-size: 1.2rem; margin-left: 0.35rem;">$0.00</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- WIZARD STEP 2: Summary & Payment -->
+      <div id="wizardStep2" class="modal-body" style="display: none;">
+        <h4 style="font-size: 1.05rem; font-weight: 700; color: #0f172a; margin-bottom: 0.75rem;">
+          <i class="fas fa-file-invoice" style="color: #2563eb;"></i> Reservation Summary
+        </h4>
+
+        <div class="summary-receipt">
+          <div class="summary-row">
+            <span>Guest Name:</span>
+            <strong id="sumCustomer">--</strong>
+          </div>
+          <div class="summary-row">
+            <span>Room Selected:</span>
+            <strong id="sumRoom">--</strong>
+          </div>
+          <div class="summary-row">
+            <span>Stay Dates:</span>
+            <span id="sumDates">--</span>
+          </div>
+          <div class="summary-row">
+            <span>Daily Rate:</span>
+            <span id="sumRate">--</span>
+          </div>
+          <div class="summary-row total">
+            <span>Total Amount Due:</span>
+            <span id="sumTotal" style="color: #2563eb;">$0.00</span>
+          </div>
+        </div>
+
+        <div class="form-row" style="margin-top: 1.25rem;">
+          <div class="form-group">
+            <label class="form-label">Payment Method</label>
+            <select name="payment_method" class="form-control">
+              <option value="Credit Card" selected>Credit Card</option>
+              <option value="Debit Card">Debit Card</option>
+              <option value="Cash">Cash at Counter</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Payment Status</label>
+            <select name="payment_status" class="form-control">
+              <option value="Pending" selected>Pending (Pay on Check-in)</option>
+              <option value="Paid">Mark as Paid Now</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer with Wizard Navigation -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="btnWizardBack" style="display: none;">
+          <i class="fas fa-arrow-left"></i> Back
+        </button>
+        <button type="button" class="btn btn-secondary" data-close-modal="newBookingModal">Close</button>
+        <button type="button" class="btn btn-primary" id="btnWizardNext">
+          Continue to Summary <i class="fas fa-arrow-right"></i>
+        </button>
+        <button type="submit" class="btn btn-success" id="btnConfirmBooking" style="display: none;">
+          <i class="fas fa-check"></i> Complete &amp; Save Booking
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ========================================================
+     QUICK ADD CUSTOMER MODAL (From Booking Wizard)
+     ======================================================== -->
+<div class="modal-overlay" id="quickCustomerModal" style="z-index: 2100;">
+  <div class="modal-card" style="max-width: 520px;">
+    <div class="modal-header">
+      <h3 class="modal-title"><i class="fas fa-user-plus"></i> Quick Register Guest</h3>
+      <button type="button" class="modal-close" data-close-modal="quickCustomerModal">&times;</button>
+    </div>
+    <form id="quickAddCustomerForm">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Full Name <span class="required">*</span></label>
+          <input type="text" name="full_name" class="form-control" placeholder="Guest Full Name" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Phone <span class="required">*</span></label>
+            <input type="tel" name="phone" class="form-control" placeholder="+1 (555) 000-0000" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email <span class="required">*</span></label>
+            <input type="email" name="email" class="form-control" placeholder="guest@email.com" required>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="quickCustomerModal">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save &amp; Select</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ========================================================
+     CANCEL BOOKING CONFIRMATION MODAL
+     ======================================================== -->
+<div class="modal-overlay" id="cancelBookingModal">
+  <div class="modal-card" style="max-width: 500px;">
+    <div class="modal-header">
+      <h3 class="modal-title" style="color: #ef4444;"><i class="fas fa-ban"></i> Cancel Reservation</h3>
+      <button type="button" class="modal-close" data-close-modal="cancelBookingModal">&times;</button>
+    </div>
+    <form id="cancelBookingForm" method="POST">
+      <div class="modal-body">
+        <p style="font-size: 0.92rem; color: #475569; margin-bottom: 1rem;">
+          Are you sure you want to cancel this reservation? The room will immediately become available for other guests, and booking history will be preserved.
+        </p>
+
+        <div class="summary-receipt">
+          <div class="summary-row">
+            <span>Reference:</span>
+            <strong id="cancel_booking_code"></strong>
+          </div>
+          <div class="summary-row">
+            <span>Guest:</span>
+            <strong id="cancel_customer_name"></strong>
+          </div>
+          <div class="summary-row">
+            <span>Room:</span>
+            <span id="cancel_room_info"></span>
+          </div>
+          <div class="summary-row">
+            <span>Stay Dates:</span>
+            <span id="cancel_dates"></span>
+          </div>
+          <div class="summary-row total">
+            <span>Total Bill:</span>
+            <span id="cancel_amount" style="color: #ef4444;"></span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="cancelBookingModal">Keep Reservation</button>
+        <button type="submit" class="btn btn-danger"><i class="fas fa-trash-alt"></i> Confirm Cancellation</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ========================================================
+     GUEST CHECK-OUT CONFIRMATION MODAL
+     ======================================================== -->
+<div class="modal-overlay" id="checkoutBookingModal">
+  <div class="modal-card" style="max-width: 500px;">
+    <div class="modal-header">
+      <h3 class="modal-title" style="color: #0d9488;"><i class="fas fa-sign-out-alt"></i> Guest Check-Out</h3>
+      <button type="button" class="modal-close" data-close-modal="checkoutBookingModal">&times;</button>
+    </div>
+    <form id="checkoutBookingForm" method="POST">
+      <div class="modal-body">
+        <p style="font-size: 0.92rem; color: #475569; margin-bottom: 1rem;">
+          Confirm guest departure and finalize stay. The room will be released for housekeeping and subsequent bookings.
+        </p>
+
+        <div class="summary-receipt">
+          <div class="summary-row">
+            <span>Booking Code:</span>
+            <strong id="checkout_booking_code"></strong>
+          </div>
+          <div class="summary-row">
+            <span>Guest:</span>
+            <strong id="checkout_customer_name"></strong>
+          </div>
+          <div class="summary-row">
+            <span>Room:</span>
+            <span id="checkout_room_info"></span>
+          </div>
+          <div class="summary-row">
+            <span>Duration:</span>
+            <span id="checkout_dates"></span>
+          </div>
+          <div class="summary-row">
+            <span>Payment Status:</span>
+            <strong id="checkout_payment_status" style="color: #2563eb;"></strong>
+          </div>
+          <div class="summary-row total">
+            <span>Final Bill:</span>
+            <span id="checkout_amount" style="color: #0d9488;"></span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="checkoutBookingModal">Cancel</button>
+        <button type="submit" class="btn btn-success"><i class="fas fa-check"></i> Complete Check-Out</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/bookings.js') }}"></script>
+<script>
+  // Setup next/back toggle buttons on wizard
+  document.getElementById('btnWizardNext').addEventListener('click', () => {
+    // Step validation handled in bookings.js
+    if (document.getElementById('wizardStep2').style.display !== 'none') {
+      document.getElementById('btnWizardNext').style.display = 'none';
+      document.getElementById('btnConfirmBooking').style.display = 'inline-flex';
+      document.getElementById('btnWizardBack').style.display = 'inline-flex';
+    }
+  });
+
+  document.getElementById('btnWizardBack').addEventListener('click', () => {
+    document.getElementById('btnWizardNext').style.display = 'inline-flex';
+    document.getElementById('btnConfirmBooking').style.display = 'none';
+    document.getElementById('btnWizardBack').style.display = 'none';
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}System Settings | {{ hotel_name }}{% endblock %}
+{% block page_title %}Settings &amp; Database Configuration{% endblock %}
+{% block page_subtitle %}Review hotel properties, application environment variables, and MySQL database connectivity{% endblock %}
+
+{% block content %}
+
+<!-- Database Status Banner -->
+<div class="surface-card">
+  <div class="surface-header">
+    <h3 class="surface-title">
+      <i class="fas fa-database" style="color: #2563eb;"></i>
+      <span>MySQL Database Connectivity</span>
+    </h3>
+    <span class="badge {% if db_connected %}badge-available{% else %}badge-occupied{% endif %}" id="dbStatusBadge">
+      <span class="badge-dot"></span>
+      <span id="dbStatusBadgeText">{% if db_connected %}Connected &amp; Operational{% else %}Disconnected / Notice{% endif %}</span>
+    </span>
+  </div>
+
+  <div style="background: #f8fafc; border-radius: 12px; padding: 1.25rem; border: 1px solid #e2e8f0; margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; font-size: 0.88rem;">
+      <div>
+        <span style="color: #64748b; display: block; font-size: 0.78rem;">Host Address</span>
+        <strong>{{ config.MYSQL_HOST }}:{{ config.MYSQL_PORT }}</strong>
+      </div>
+      <div>
+        <span style="color: #64748b; display: block; font-size: 0.78rem;">Database Name</span>
+        <strong>{{ config.MYSQL_DB }}</strong>
+      </div>
+      <div>
+        <span style="color: #64748b; display: block; font-size: 0.78rem;">Database User</span>
+        <strong>{{ config.MYSQL_USER }}</strong>
+      </div>
+      <div>
+        <span style="color: #64748b; display: block; font-size: 0.78rem;">Password Status</span>
+        <strong>{% if config.MYSQL_PASSWORD %}Configured (Hidden){% else %}Empty (Default XAMPP){% endif %}</strong>
+      </div>
+    </div>
+
+    <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid #e2e8f0; font-size: 0.85rem; color: #475569;">
+      <strong>Diagnostic Message:</strong> <span id="dbDiagnosticMsg">{{ db_message }}</span>
+    </div>
+  </div>
+
+  <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+    <button type="button" class="btn btn-primary btn-sm" id="btnTestDbConnection">
+      <i class="fas fa-sync-alt"></i> Test Connection Now
+    </button>
+    <form action="{{ url_for('general.initialize_database_action') }}" method="POST" onsubmit="return confirm('Initialize database schema and populate demonstration data?');" style="display: inline;">
+      <button type="submit" class="btn btn-gold btn-sm">
+        <i class="fas fa-file-import"></i> Auto-Initialize Database from schema.sql
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Hotel Brand & Operational Settings (Read from .env) -->
+<div class="surface-card">
+  <div class="surface-header">
+    <h3 class="surface-title">
+      <i class="fas fa-hotel" style="color: #f59e0b;"></i>
+      <span>Hotel Profile &amp; Business Rules</span>
+    </h3>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.25rem;">
+    <div class="form-group">
+      <label class="form-label">Hotel Name</label>
+      <input type="text" class="form-control" value="{{ config.HOTEL_NAME }}" readonly style="background-color: #f8fafc;">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Brand Tagline</label>
+      <input type="text" class="form-control" value="{{ config.HOTEL_TAGLINE }}" readonly style="background-color: #f8fafc;">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Reception Phone</label>
+      <input type="text" class="form-control" value="{{ config.HOTEL_PHONE }}" readonly style="background-color: #f8fafc;">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Reservation Email</label>
+      <input type="text" class="form-control" value="{{ config.HOTEL_EMAIL }}" readonly style="background-color: #f8fafc;">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Currency Symbol</label>
+      <input type="text" class="form-control" value="{{ config.HOTEL_CURRENCY }}" readonly style="background-color: #f8fafc;">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Occupancy Tax Rate</label>
+      <input type="text" class="form-control" value="{{ (config.HOTEL_TAX_RATE * 100) | int }}%" readonly style="background-color: #f8fafc;">
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label class="form-label">Hotel Address</label>
+    <input type="text" class="form-control" value="{{ config.HOTEL_ADDRESS }}" readonly style="background-color: #f8fafc;">
+  </div>
+
+  <div style="background: #eff6ff; border-radius: 10px; padding: 1rem; border-left: 4px solid #2563eb; margin-top: 1rem;">
+    <p style="font-size: 0.85rem; color: #1e40af;">
+      <i class="fas fa-info-circle"></i> <strong>Configuration Note:</strong> To customize hotel names, tax rates, or MySQL credentials, modify your local <code>.env</code> file in the project root directory. Changes will take effect upon restarting the Flask application.
+    </p>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.getElementById('btnTestDbConnection').addEventListener('click', async () => {
+    const btn = document.getElementById('btnTestDbConnection');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing MySQL...';
+
+    try {
+      const res = await fetch('/settings/test-db');
+      const data = await res.json();
+      
+      const badge = document.getElementById('dbStatusBadge');
+      const badgeText = document.getElementById('dbStatusBadgeText');
+      const msg = document.getElementById('dbDiagnosticMsg');
+
+      if (data.connected) {
+        badge.className = 'badge badge-available';
+        badgeText.textContent = 'Connected & Operational';
+        showToast('MySQL Database is connected and healthy!', 'success');
+      } else {
+        badge.className = 'badge badge-occupied';
+        badgeText.textContent = 'Disconnected / Notice';
+        showToast(data.message, 'error');
+      }
+      msg.textContent = data.message;
+    } catch (err) {
+      showToast('Failed to contact server API.', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-sync-alt"></i> Test Connection Now';
+    }
+  });
+</script>
+{% endblock %}

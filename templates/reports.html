@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}Reports &amp; Analytics | {{ hotel_name }}{% endblock %}
+{% block page_title %}Operational Analytics &amp; Reports{% endblock %}
+{% block page_subtitle %}Comprehensive hotel performance metrics, revenue analytics, and data exports{% endblock %}
+
+{% block content %}
+
+<!-- Top KPI Summary Bar -->
+<div class="stats-grid">
+  <div class="stat-card blue">
+    <div class="stat-info">
+      <span class="stat-label">Occupancy Rate</span>
+      <span class="stat-value">{{ occupancy_rate }}%</span>
+      <span class="stat-meta"><i class="fas fa-chart-line"></i> Current live capacity</span>
+    </div>
+    <div class="stat-icon-wrapper">
+      <i class="fas fa-percentage"></i>
+    </div>
+  </div>
+
+  <div class="stat-card green">
+    <div class="stat-info">
+      <span class="stat-label">Total Realized Revenue</span>
+      <span class="stat-value">{{ booking_metrics.total_revenue | currency }}</span>
+      <span class="stat-meta"><i class="fas fa-check-circle" style="color: #10b981;"></i> From paid reservations</span>
+    </div>
+    <div class="stat-icon-wrapper">
+      <i class="fas fa-coins"></i>
+    </div>
+  </div>
+
+  <div class="stat-card purple">
+    <div class="stat-info">
+      <span class="stat-label">Total Bookings</span>
+      <span class="stat-value">{{ booking_metrics.total_bookings }}</span>
+      <span class="stat-meta"><i class="fas fa-book"></i> Lifetime reservations</span>
+    </div>
+    <div class="stat-icon-wrapper">
+      <i class="fas fa-calendar-check"></i>
+    </div>
+  </div>
+
+  <div class="stat-card red">
+    <div class="stat-info">
+      <span class="stat-label">Cancellations</span>
+      <span class="stat-value">{{ booking_metrics.total_cancellations }}</span>
+      <span class="stat-meta"><i class="fas fa-ban" style="color: #ef4444;"></i> Total cancelled stays</span>
+    </div>
+    <div class="stat-icon-wrapper">
+      <i class="fas fa-user-times"></i>
+    </div>
+  </div>
+</div>
+
+<!-- Export Data Card -->
+<div class="filter-bar" style="justify-content: space-between;">
+  <div style="display: flex; align-items: center; gap: 0.75rem;">
+    <i class="fas fa-file-export" style="color: #2563eb; font-size: 1.25rem;"></i>
+    <div>
+      <h4 style="font-size: 0.95rem; font-weight: 700; color: #0f172a;">Export Database Reports</h4>
+      <p style="font-size: 0.78rem; color: #64748b;">Download raw database records in CSV spreadsheet format for external analysis</p>
+    </div>
+  </div>
+
+  <div style="display: flex; gap: 0.75rem;">
+    <a href="{{ url_for('reports.export_bookings_csv') }}" class="btn btn-sm btn-primary">
+      <i class="fas fa-file-csv"></i> Export Bookings CSV
+    </a>
+    <a href="{{ url_for('reports.export_rooms_csv') }}" class="btn btn-sm btn-secondary">
+      <i class="fas fa-file-csv"></i> Export Room Inventory CSV
+    </a>
+  </div>
+</div>
+
+<!-- Charts Grid -->
+<div class="charts-grid">
+  <!-- Revenue Growth Chart -->
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3 class="chart-title">
+        <i class="fas fa-chart-bar"></i>
+        <span>Monthly Revenue Trends</span>
+      </h3>
+      <span class="chart-badge">Recorded Collections</span>
+    </div>
+    <div class="chart-body">
+      <canvas id="reportRevenueChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Booking Trends Line Chart -->
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3 class="chart-title">
+        <i class="fas fa-chart-line"></i>
+        <span>Booking Volume Trajectory</span>
+      </h3>
+      <span class="chart-badge">Monthly Volume</span>
+    </div>
+    <div class="chart-body">
+      <canvas id="reportTrendsChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Popular Room Types Horizontal Bar Chart -->
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3 class="chart-title">
+        <i class="fas fa-crown"></i>
+        <span>Most Popular Room Categories</span>
+      </h3>
+      <span class="chart-badge">Demand Ranking</span>
+    </div>
+    <div class="chart-body">
+      <canvas id="reportTypesChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Room Inventory Status Doughnut Chart -->
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3 class="chart-title">
+        <i class="fas fa-pie-chart"></i>
+        <span>Room Availability vs. Occupancy</span>
+      </h3>
+      <span class="chart-badge">Current Ratio</span>
+    </div>
+    <div class="chart-body">
+      <canvas id="reportStatusChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Room Type Performance Breakdown Table -->
+<div class="surface-card">
+  <div class="surface-header">
+    <h3 class="surface-title">
+      <i class="fas fa-table"></i>
+      <span>Room Category Performance Summary</span>
+    </h3>
+  </div>
+
+  <div class="table-responsive">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Room Category</th>
+          <th>Total Bookings Logged</th>
+          <th>Total Revenue Contributed</th>
+          <th>Average Value / Stay</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for pt in popular_types %}
+          <tr>
+            <td><strong>{{ pt.room_type }}</strong></td>
+            <td>
+              <span class="badge" style="background: #eff6ff; color: #2563eb; font-weight: 700;">
+                {{ pt.total_booked }} reservation(s)
+              </span>
+            </td>
+            <td><strong style="color: #0f172a;">{{ pt.revenue_generated | currency }}</strong></td>
+            <td>
+              {% if pt.total_booked > 0 %}
+                {{ (pt.revenue_generated / pt.total_booked) | currency }}
+              {% else %}
+                $0.00
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/reports.js') }}"></script>
+{% endblock %}

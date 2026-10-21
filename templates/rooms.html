@@ -1,0 +1,403 @@
+{% extends "base.html" %}
+
+{% block title %}Room Management | {{ hotel_name }}{% endblock %}
+{% block page_title %}Room Inventory &amp; Management{% endblock %}
+{% block page_subtitle %}Manage room categories, pricing, capacities, and availability statuses{% endblock %}
+
+{% block content %}
+
+<!-- Summary Pill Bar -->
+<div class="stats-grid" style="margin-bottom: 1.5rem;">
+  <div class="stat-card blue" style="padding: 1rem 1.25rem;">
+    <div class="stat-info">
+      <span class="stat-label">Total Rooms</span>
+      <span class="stat-value" style="font-size: 1.5rem;">{{ stats.total_rooms }}</span>
+    </div>
+    <div class="stat-icon-wrapper" style="width: 44px; height: 44px; font-size: 1.2rem;">
+      <i class="fas fa-th-large"></i>
+    </div>
+  </div>
+
+  <div class="stat-card green" style="padding: 1rem 1.25rem;">
+    <div class="stat-info">
+      <span class="stat-label">Available</span>
+      <span class="stat-value" style="font-size: 1.5rem;">{{ stats.available_rooms }}</span>
+    </div>
+    <div class="stat-icon-wrapper" style="width: 44px; height: 44px; font-size: 1.2rem;">
+      <i class="fas fa-check"></i>
+    </div>
+  </div>
+
+  <div class="stat-card red" style="padding: 1rem 1.25rem;">
+    <div class="stat-info">
+      <span class="stat-label">Occupied</span>
+      <span class="stat-value" style="font-size: 1.5rem;">{{ stats.occupied_rooms }}</span>
+    </div>
+    <div class="stat-icon-wrapper" style="width: 44px; height: 44px; font-size: 1.2rem;">
+      <i class="fas fa-user-friends"></i>
+    </div>
+  </div>
+
+  <div class="stat-card gold" style="padding: 1rem 1.25rem;">
+    <div class="stat-info">
+      <span class="stat-label">Maintenance</span>
+      <span class="stat-value" style="font-size: 1.5rem;">{{ stats.maintenance_rooms }}</span>
+    </div>
+    <div class="stat-icon-wrapper" style="width: 44px; height: 44px; font-size: 1.2rem;">
+      <i class="fas fa-tools"></i>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================
+     FILTER & SEARCH BAR
+     ======================================================== -->
+<form method="GET" action="{{ url_for('rooms.list_rooms') }}" class="filter-bar">
+  <div class="search-box">
+    <i class="fas fa-search"></i>
+    <input type="text" name="search" class="search-input" placeholder="Search room number, amenities..." value="{{ search }}">
+  </div>
+
+  <select name="room_type" class="filter-select" onchange="this.form.submit()">
+    <option value="ALL" {% if selected_type == 'ALL' %}selected{% endif %}>All Room Types</option>
+    <option value="Standard" {% if selected_type == 'Standard' %}selected{% endif %}>Standard Room</option>
+    <option value="Deluxe" {% if selected_type == 'Deluxe' %}selected{% endif %}>Deluxe Room</option>
+    <option value="Suite" {% if selected_type == 'Suite' %}selected{% endif %}>Executive Suite</option>
+    <option value="Family Room" {% if selected_type == 'Family Room' %}selected{% endif %}>Family Room</option>
+  </select>
+
+  <select name="status" class="filter-select" onchange="this.form.submit()">
+    <option value="ALL" {% if selected_status == 'ALL' %}selected{% endif %}>All Statuses</option>
+    <option value="Available" {% if selected_status == 'Available' %}selected{% endif %}>Available</option>
+    <option value="Occupied" {% if selected_status == 'Occupied' %}selected{% endif %}>Occupied</option>
+    <option value="Maintenance" {% if selected_status == 'Maintenance' %}selected{% endif %}>Maintenance</option>
+  </select>
+
+  <select name="sort_by" class="filter-select" onchange="this.form.submit()">
+    <option value="room_number_asc" {% if selected_sort == 'room_number_asc' %}selected{% endif %}>Sort: Room Number</option>
+    <option value="price_asc" {% if selected_sort == 'price_asc' %}selected{% endif %}>Price: Low to High</option>
+    <option value="price_desc" {% if selected_sort == 'price_desc' %}selected{% endif %}>Price: High to Low</option>
+    <option value="capacity_desc" {% if selected_sort == 'capacity_desc' %}selected{% endif %}>Capacity: Largest</option>
+  </select>
+
+  {% if search or selected_type != 'ALL' or selected_status != 'ALL' %}
+    <a href="{{ url_for('rooms.list_rooms') }}" class="btn btn-secondary btn-sm" title="Clear Filters">
+      <i class="fas fa-times"></i> Reset
+    </a>
+  {% endif %}
+
+  <div style="margin-left: auto; display: flex; align-items: center; gap: 0.5rem;">
+    <!-- View Switcher -->
+    <button type="button" class="btn btn-sm btn-primary active" id="btnViewCards" title="Grid Card View">
+      <i class="fas fa-th-large"></i>
+    </button>
+    <button type="button" class="btn btn-sm btn-secondary" id="btnViewTable" title="Table View">
+      <i class="fas fa-list"></i>
+    </button>
+    
+    <!-- Add Room Button -->
+    <button type="button" class="btn btn-sm btn-gold" onclick="openModal('addRoomModal')" style="margin-left: 0.5rem;">
+      <i class="fas fa-plus"></i> Add New Room
+    </button>
+  </div>
+</form>
+
+<!-- ========================================================
+     ROOMS CARDS VIEW (DEFAULT)
+     ======================================================== -->
+<div class="rooms-grid" id="roomsCardsView">
+  {% if rooms %}
+    {% for r in rooms %}
+      <div class="room-card">
+        <div class="room-card-header">
+          <div class="room-number-badge">
+            <div class="room-num-box">{{ r.room_number }}</div>
+            <div class="room-title-info">
+              <h3>{{ r.room_type }}</h3>
+              <span>Floor {{ r.room_number[0] }}</span>
+            </div>
+          </div>
+          <span class="badge badge-{{ r.status.lower() }}">
+            <span class="badge-dot"></span> {{ r.status }}
+          </span>
+        </div>
+
+        <div class="room-card-body">
+          <div class="room-meta-pills">
+            <div class="room-meta-pill">
+              <i class="fas fa-user-friends"></i>
+              <span>Up to {{ r.capacity }} Guests</span>
+            </div>
+            <div class="room-meta-pill">
+              <i class="fas fa-wifi"></i>
+              <span>Free Wi-Fi</span>
+            </div>
+          </div>
+          <p class="room-card-desc">{{ r.description or 'Comfortable and elegantly furnished guest room with modern hotel amenities.' }}</p>
+        </div>
+
+        <div class="room-card-footer">
+          <div class="room-price-box">
+            <span class="room-price-val">{{ r.price_per_night | currency }}</span>
+            <span class="room-price-unit">per night</span>
+          </div>
+
+          <div class="room-card-actions">
+            <button type="button" class="btn-icon btn-view" data-view-room="{{ r.id }}" title="View Details">
+              <i class="fas fa-eye"></i>
+            </button>
+            <button type="button" class="btn-icon btn-edit" data-edit-room="{{ r.id }}" title="Edit Room">
+              <i class="fas fa-edit"></i>
+            </button>
+            <button type="button" class="btn-icon btn-delete" data-delete-room="{{ r.id }}" data-room-num="{{ r.room_number }}" title="Delete Room">
+              <i class="fas fa-trash-alt"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div style="grid-column: 1/-1;">
+      <div class="empty-state surface-card">
+        <div class="empty-icon"><i class="fas fa-search"></i></div>
+        <h4 class="empty-title">No Rooms Found</h4>
+        <p class="empty-desc">No rooms match your filter or search criteria. Try modifying your filters or add a new room.</p>
+        <button type="button" class="btn btn-primary" onclick="openModal('addRoomModal')">
+          <i class="fas fa-plus"></i> Add New Room
+        </button>
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+<!-- ========================================================
+     ROOMS TABLE VIEW (OPTIONAL TOGGLE)
+     ======================================================== -->
+<div class="surface-card" id="roomsTableView" style="display: none;">
+  <div class="table-responsive">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Room Number</th>
+          <th>Type</th>
+          <th>Price / Night</th>
+          <th>Capacity</th>
+          <th>Current Status</th>
+          <th>Active Bookings</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rooms %}
+          <tr>
+            <td><strong>Room {{ r.room_number }}</strong></td>
+            <td>{{ r.room_type }}</td>
+            <td><strong>{{ r.price_per_night | currency }}</strong></td>
+            <td>{{ r.capacity }} Guests</td>
+            <td>
+              <span class="badge badge-{{ r.status.lower() }}">
+                <span class="badge-dot"></span> {{ r.status }}
+              </span>
+            </td>
+            <td>{{ r.active_bookings_count or 0 }}</td>
+            <td>
+              <div class="action-btn-group">
+                <button type="button" class="btn-icon btn-view" data-view-room="{{ r.id }}" title="View Details">
+                  <i class="fas fa-eye"></i>
+                </button>
+                <button type="button" class="btn-icon btn-edit" data-edit-room="{{ r.id }}" title="Edit Room">
+                  <i class="fas fa-edit"></i>
+                </button>
+                <button type="button" class="btn-icon btn-delete" data-delete-room="{{ r.id }}" data-room-num="{{ r.room_number }}" title="Delete Room">
+                  <i class="fas fa-trash-alt"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block modals %}
+<!-- ========================================================
+     ADD ROOM MODAL
+     ======================================================== -->
+<div class="modal-overlay" id="addRoomModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 class="modal-title"><i class="fas fa-door-open"></i> Add New Hotel Room</h3>
+      <button type="button" class="modal-close" data-close-modal="addRoomModal">&times;</button>
+    </div>
+    <form action="{{ url_for('rooms.add_room') }}" method="POST">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Room Number <span class="required">*</span></label>
+            <input type="text" name="room_number" class="form-control" placeholder="e.g. 101, 204" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Room Type <span class="required">*</span></label>
+            <select name="room_type" class="form-control" required>
+              <option value="Standard">Standard Room</option>
+              <option value="Deluxe">Deluxe Room</option>
+              <option value="Suite">Executive Suite</option>
+              <option value="Family Room">Family Room</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Price Per Night ($) <span class="required">*</span></label>
+            <input type="number" step="0.01" min="1" name="price_per_night" class="form-control" placeholder="89.00" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Guest Capacity <span class="required">*</span></label>
+            <input type="number" min="1" max="10" name="capacity" class="form-control" value="2" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Initial Status</label>
+          <select name="status" class="form-control">
+            <option value="Available" selected>Available</option>
+            <option value="Occupied">Occupied</option>
+            <option value="Maintenance">Maintenance</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Description &amp; Amenities</label>
+          <textarea name="description" class="form-control" placeholder="e.g. King pillowtop bed, balcony with city view, minibar, luxury ensuite bath..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="addRoomModal">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Room</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ========================================================
+     EDIT ROOM MODAL
+     ======================================================== -->
+<div class="modal-overlay" id="editRoomModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 class="modal-title"><i class="fas fa-edit"></i> Edit Room Details</h3>
+      <button type="button" class="modal-close" data-close-modal="editRoomModal">&times;</button>
+    </div>
+    <form id="editRoomForm" method="POST">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Room Number <span class="required">*</span></label>
+            <input type="text" id="edit_room_number" name="room_number" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Room Type <span class="required">*</span></label>
+            <select id="edit_room_type" name="room_type" class="form-control" required>
+              <option value="Standard">Standard Room</option>
+              <option value="Deluxe">Deluxe Room</option>
+              <option value="Suite">Executive Suite</option>
+              <option value="Family Room">Family Room</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Price Per Night ($) <span class="required">*</span></label>
+            <input type="number" step="0.01" min="1" id="edit_price_per_night" name="price_per_night" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Guest Capacity <span class="required">*</span></label>
+            <input type="number" min="1" max="10" id="edit_capacity" name="capacity" class="form-control" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select id="edit_status" name="status" class="form-control">
+            <option value="Available">Available</option>
+            <option value="Occupied">Occupied</option>
+            <option value="Maintenance">Maintenance</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Description &amp; Amenities</label>
+          <textarea id="edit_description" name="description" class="form-control"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="editRoomModal">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Update Room</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ========================================================
+     VIEW ROOM DETAILS MODAL
+     ======================================================== -->
+<div class="modal-overlay" id="viewRoomModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 class="modal-title" id="view_room_number"><i class="fas fa-bed"></i> Room Details</h3>
+      <button type="button" class="modal-close" data-close-modal="viewRoomModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+        <div>
+          <h4 id="view_room_type" style="font-size: 1.2rem; font-weight: 700; color: #0f172a;"></h4>
+          <span id="view_room_status_badge" class="badge"></span>
+        </div>
+        <div style="text-align: right;">
+          <div id="view_room_price" style="font-size: 1.4rem; font-weight: 800; color: #2563eb;"></div>
+          <small id="view_room_capacity" style="color: #64748b; font-weight: 600;"></small>
+        </div>
+      </div>
+      <div style="background: #f8fafc; border-radius: 12px; padding: 1.25rem; border: 1px solid #e2e8f0;">
+        <h5 style="font-size: 0.8rem; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px; margin-bottom: 0.5rem;">Description</h5>
+        <p id="view_room_description" style="font-size: 0.9rem; color: #334155; line-height: 1.6;"></p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" data-close-modal="viewRoomModal">Close</button>
+      <button type="button" class="btn btn-primary" data-trigger-booking><i class="fas fa-calendar-plus"></i> Book This Room</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================
+     DELETE ROOM CONFIRMATION MODAL
+     ======================================================== -->
+<div class="modal-overlay" id="deleteRoomModal">
+  <div class="modal-card" style="max-width: 480px;">
+    <div class="modal-header">
+      <h3 class="modal-title" style="color: #ef4444;"><i class="fas fa-exclamation-triangle"></i> Delete Room</h3>
+      <button type="button" class="modal-close" data-close-modal="deleteRoomModal">&times;</button>
+    </div>
+    <form id="deleteRoomForm" method="POST">
+      <div class="modal-body">
+        <p id="delete_room_text" style="font-size: 0.92rem; color: #475569; line-height: 1.5;"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="deleteRoomModal">Cancel</button>
+        <button type="submit" class="btn btn-danger"><i class="fas fa-trash-alt"></i> Confirm Delete</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/rooms.js') }}"></script>
+{% endblock %}
